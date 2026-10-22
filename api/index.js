@@ -2,9 +2,9 @@ const DEFAULT_MODEL = "gpt-6-astra";
 const MAX_HISTORY_MESSAGES = 8;
 const MAX_HISTORY_MESSAGE_CHARS = 1200;
 const MAX_ALICE_TEXT = 1024;
-const TOTAL_RESPONSE_BUDGET_MS = 3600;
+const TOTAL_RESPONSE_BUDGET_MS = 4000;
 const SERPER_TIMEOUT_MS = 600;
-const OPENAI_TIMEOUT_MS = 2500;
+const OPENAI_TIMEOUT_MS = 3200;
 
 const SYSTEM_PROMPT = [
   "Ты — полезный голосовой помощник в навыке Яндекс Алисы.",
@@ -146,7 +146,7 @@ async function askOpenAI(text, history, searchContext, timeoutMs) {
         reasoning: { effort: "low" },
         instructions: SYSTEM_PROMPT,
         input,
-        max_output_tokens: 240
+        max_output_tokens: 600
       })
     },
     Math.min(OPENAI_TIMEOUT_MS, timeoutMs)
@@ -170,6 +170,13 @@ async function askOpenAI(text, history, searchContext, timeoutMs) {
   const answer = String(data?.output_text || outputText).trim();
 
   if (!answer) {
+    console.warn("OpenAI returned no text:", JSON.stringify({
+      status: data?.status,
+      incomplete_details: data?.incomplete_details,
+      output_types: Array.isArray(data?.output)
+        ? data.output.map(item => ({ type: item?.type, content_types: Array.isArray(item?.content) ? item.content.map(part => part?.type) : [] }))
+        : []
+    }));
     throw new Error("OPENAI_EMPTY_RESPONSE");
   }
   return answer;
@@ -249,7 +256,10 @@ export default async function handler(req, res) {
 
     return res.status(200).json(aliceResponse(answer, false, history));
   } catch (error) {
-    const safeError = error?.message === "AbortError" ? "TIME_BUDGET_EXHAUSTED" : error;
+    const wasAborted = error?.name === "AbortError"
+      || error?.message === "AbortError"
+      || /operation was aborted|aborted/i.test(String(error?.message || ""));
+    const safeError = wasAborted ? "TIME_BUDGET_EXHAUSTED" : error;
     console.warn("Alice webhook returned a fallback response:", safeError?.message || "unknown error");
     return res.status(200).json(aliceResponse(errorForUser(safeError), false, oldHistory));
   }
