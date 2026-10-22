@@ -49,6 +49,10 @@ function isSearchIntent(text) {
   return /\b(latest|today|current|news|weather|price|exchange rate|recent|search|look up)\b|сегодня|сейчас|последн|новост|погод|курс валют|найди|поищи|актуальн|сколько стоит|свежие данные/i.test(text);
 }
 
+function isGreeting(text) {
+  return /^(привет|здравствуй(?:те)?|доброе утро|добрый день|добрый вечер|хай|hello|hi)[!.?\s]*$/i.test(text);
+}
+
 function safeHistory(history) {
   if (!Array.isArray(history)) return [];
   return history
@@ -203,6 +207,14 @@ export default async function handler(req, res) {
   if (!text) {
     return res.status(200).json(aliceResponse(
       "Привет! Я могу ответить на вопрос или найти актуальную информацию. Что хочешь узнать?",
+      false,
+      oldHistory
+    ));
+  }
+
+  if (isGreeting(text)) {
+    return res.status(200).json(aliceResponse(
+      "Привет! Чем могу помочь?",
       false,
       oldHistory
     ));
