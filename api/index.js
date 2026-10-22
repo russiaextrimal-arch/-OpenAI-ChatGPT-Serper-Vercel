@@ -160,7 +160,14 @@ async function askOpenAI(text, history, searchContext, timeoutMs) {
     throw new Error("OPENAI_REQUEST_FAILED");
   }
 
-  const answer = String(data?.output_text || "").trim();
+  const outputText = Array.isArray(data?.output)
+    ? data.output
+        .flatMap(item => Array.isArray(item?.content) ? item.content : [])
+        .filter(item => item?.type === "output_text" && typeof item.text === "string")
+        .map(item => item.text)
+        .join("\n")
+    : "";
+  const answer = String(data?.output_text || outputText).trim();
 
   if (!answer) {
     throw new Error("OPENAI_EMPTY_RESPONSE");
